@@ -1,0 +1,454 @@
+<head>
+	<script src="./node_modules/web3/dist/web3.min.js"></script>
+<!--
+	<script src="https://code.jquery.com/jquery-3.2.1.slim.min.js"></script>
+	<script src="js/jquery-3.2.1.min.js"></script>
+	<link rel="stylesheet" href="bootstrap/css/bootstrap.min.css">
+-->
+	<script src="bootstrap/js/bootstrap.min.js"></script>
+	<script src="js/AppContractJSON.js"></script>
+
+	<script src="https://ajax.googleapis.com/ajax/libs/jquery/3.3.1/jquery.min.js"></script>
+	<link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css">
+	<script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/js/bootstrap.min.js"></script>
+	
+	<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap-datepicker/1.4.1/css/bootstrap-datepicker3.css"/>
+	<script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap-datepicker/1.4.1/js/bootstrap-datepicker.min.js"></script>
+
+</head>
+
+
+<body>
+	<div class="container">
+		<h1>My Smart Contract</h1>
+
+		<div id="maindiv" style="padding: 10px">
+			<ul class="nav nav-tabs">
+				<li class="active"><a href="#infoTab" data-index="0">Info</a></li>
+				<li><a href="#demoTab" data-index="6">Demo</a></li>
+  			</ul>
+
+  			<div class="tab-content">
+				<div id="infoTab" class="tab-pane fade in active" style="padding: 10px">
+					<hr>
+					<hr>
+					<form>
+						<div class="form-group row">
+							<label for="inpDriverAddress" class="col-sm-3 col-form-label">Driver Address</label>
+							<div class="col-sm-6">
+								<input type="text" class="form-control" id="inpDriverAddress">
+							</div>
+						</div>
+						<div class="form-group row">
+							<label for="inpDriverCap" class="col-sm-3 col-form-label">Driver Cap</label>
+							<div class="col-sm-6">
+								<input type="number" class="form-control" id="inpDriverCap">
+							</div>
+						</div>
+						<div class="form-group row">
+							<label for="inpDriverTicket" class="col-sm-3 col-form-label">Ticket Price</label>
+							<div class="col-sm-6">
+								<input type="number" class="form-control" id="inpDriverTicket">
+							</div>
+						</div>
+					</form>
+					<button type="button" class="btn btn-primary" id="btnDriverInfo">Update</button>
+					<hr>
+					<hr>
+      				<table class="table" id="tableinfo"></table>
+    			</div>
+				<div id="demoTab" class="tab-pane fade" style="padding: 10px">
+					<button class="btn btn-warning" id="btnAllParticipants">Add 100 Participants</button>
+					<a type="button" class="btn btn-success" id="btnStartDemo">Start Demo</a>
+					<h4 id="warnGenerate" hidden>Demonstration is being generated! Please wait!</h4>
+					<table class="table" id="tabledemo"></table>
+			  </div>
+  			</div>
+		</div>
+	</div>
+
+	<div class="modal" tabindex="-1" id="ModalInfoChange" role="dialog">
+		<div class="modal-dialog" role="document">
+    		<div class="modal-content">
+      			<div class="modal-header">
+        			<h2 class="modal-title">Set Address</h2>
+        			<button type="button" class="close" data-dismiss="modal" aria-label="Close">
+          			<span aria-hidden="true">&times;</span>
+        			</button>
+      			</div>
+      			<div class="modal-body">
+      				<input type="hidden" id="inpInfoChange" />
+        			<label for="inpPossAddress">Address</label>
+    				<input type="text" class="form-control" id="inpPossAddress" />
+      			</div>
+      			<div class="modal-footer">
+        			<button type="button" class="btn btn-primary" id="btnInfoChange">Save</button>
+      			</div>
+    		</div>
+  		</div>
+	</div>
+
+	<div class="modal" tabindex="-1" id="ModalShowBalance" role="dialog">
+		<div class="modal-dialog" role="document">
+    		<div class="modal-content">
+      			<div class="modal-header">
+        			<h2 class="modal-title">Balances</h2>
+        			<button type="button" class="close" data-dismiss="modal" aria-label="Close">
+          			<span aria-hidden="true">&times;</span>
+        			</button>
+      			</div>
+      			<div class="modal-body">
+					<table class="table" id="tableshowbalance">
+						<thead>
+							<tr>
+								<th style='width: 60%'>Address</th>
+								<th style='width: 40%'>Balance</th>
+							</tr>
+						</thead>
+						<tbody id="tablebodyshowbalance"></tbody>
+					</table>
+      			</div>
+    		</div>
+  		</div>
+	</div>
+
+	<script>
+		var web3 = (typeof web3 !== 'undefined') ? new Web3(web3.currentProvider) : new Web3(new Web3.providers.HttpProvider("http://localhost:8545"));
+		web3.eth.defaultAccount = web3.eth.accounts[0];
+		var AppContract = web3.eth.contract(ABI);
+		var AppObj = AppContract.at(ContractAddress);
+
+		demoLog = [];
+		demoLogParticipant = [];
+
+		Address_CarDealer = 0;
+		Address_Manager = 0;
+		Address_TaxiDriver = 0;
+		Address_Customer = web3.eth.accounts[3];
+
+		TaxiDriver_Cap = 0;
+		TaxiDriver_Ticket = 0;
+
+		CarDealer_FixedExpenses = 10;
+
+		DemoTableHtml = "";
+		OwnedCar = "";
+
+		var DemoDay;
+
+		$(document).ready(function(){
+			var date_input=$('input#inpValidation');
+    	 	var container=$('.bootstrap-iso form').length>0 ? $('.bootstrap-iso form').parent() : "body";
+        	date_input.datepicker({
+            	format: 'dd/mm/yyyy',
+            	container: container,
+            	todayHighlight: true,
+            	autoclose: true,
+			});
+
+			AppObj.SetManager(web3.eth.defaultAccount);
+			AppObj.SetCarDealer(web3.eth.accounts[1]);
+			AppObj.SetDriver(web3.eth.accounts[2], 2, 20);
+
+			GetAllInfo();
+		});
+		   
+		function DivideETH(amount){
+			return amount / 1000000000000000000;
+		}
+
+		function MultiplyETH(amount){
+			return amount * 1000000000000000000;
+		}
+
+		function GetDateString(dateObj){
+			return dateObj.getUTCDate() + "/" + (dateObj.getUTCMonth()+1) + "/" + dateObj.getUTCFullYear();
+		}
+
+		function CreateLine(dateTxt, detailTxt, price, income, showDriverBalance, showPartBalance){
+			var priceTxt = "";
+			if(price != 0){
+				priceTxt += "<p style='color: " + (income ? "green" : "red") + "'><b>" + DivideETH(price) + " ETH</b></p>";
+			}
+
+			if(priceTxt == "" && (showDriverBalance || showPartBalance)){
+				priceTxt += "<button class='btn btn-warning' id='btnShowBalance";
+				
+				if(showDriverBalance)
+					priceTxt += "D";
+				else if(showPartBalance)
+					priceTxt += "P";
+				
+				priceTxt += "'>Show Balance</button>";
+			}
+
+			var line = "<tr><td><b>" + dateTxt + "</b></td><td>" + detailTxt + "</td><td>" + priceTxt + "</td><td><p><b>" + web3.fromWei(web3.eth.getBalance(ContractAddress), 'ether').toString() + " ETH</b></p></td><tr>";
+			return line;
+		}
+
+		$(".nav-tabs a").click(function(){
+			var index = $(this).data("index");
+			if(index == 0)
+				GetAllInfo();
+			else if(index == 6)
+				DemoConfig();
+
+			$(this).tab('show');
+		});
+
+		function InitializeParticipants(){
+			AppObj.GetAllParticipants(function(error, result){
+				if(!error){
+					var participantCount = result[0].length;
+					for(var i=0;i<participantCount;i++){
+						demoLogParticipant.push(result[0][i]);
+					}
+
+					DemoTableHtml += "<thead><tr><th style='width: 20%'>Date</th><th style='width: 60%'>Operation</th><th style='width: 10%'>Amount</th><th style='width: 10%'>Contract Balance</th><tr></thead><tbody>";
+					DemoTableHtml += CreateLine(GetDateString(DemoDay), "<b>100 participants joined!</b>", result[1], true, false, false);
+				}
+			});
+		}
+
+		function InitializeCarProposalAndPurchaseCar(){
+			var carID = "";
+			for(var i=0;i<32;i++){
+				carID += (Math.floor(Math.random() * Math.floor(10))).toString();
+			}
+
+			var price = Math.floor(Math.random() * Math.floor(500)) * 10;
+			var date = new Date();
+			date.setDate(date.getDate() + 10);
+			var timestamp = date.getTime() / 1000;
+
+			AppObj.CarPropose(carID, price, timestamp, {from: Address_CarDealer, gas: 300000});
+			DemoTableHtml += CreateLine(GetDateString(DemoDay), "<b>Car Dealer set car propose!</b><br><i>CarID : " + carID + "<br>Price : " + price + "<br>Valid Time : " + GetDateString(date) + "</i>", 0, false, false, false);
+			
+			AppObj.PurchaseCar((DemoDay.getTime() / 1000));
+			
+			AppObj.GetCarProposalAndBalance(function(error, result){
+				if(!error){
+					DemoTableHtml += CreateLine(GetDateString(DemoDay), "<b>Manager purchased the proposal car!</b>", result[0], false, false, false);
+					OwnedCar = carID;
+				}
+			});
+		}
+
+		function CreateTransactionsToLog(){
+			var demoCount = 10;
+			var startDate = new Date();
+			var day = 1000 * 60 * 60 * 24;
+			var lastOneMonthControl = new Date();
+			var lastSixMonthsControl = new Date();
+			while(Math.floor(DemoDay.getTime() - startDate.getTime()) / day / 31 / 12 < 1){
+				var s_day = DemoDay.getUTCDate();
+				var s_month = DemoDay.getUTCMonth() + 1;
+				var s_year = DemoDay.getUTCFullYear();
+				
+				if(Math.floor(DemoDay.getTime() - lastOneMonthControl.getTime()) / day / 31 >= 1){
+					demoLog.push({"op": "PS", "date": GetDateString(DemoDay), "timestamp" : DemoDay.getTime() / 1000});
+					lastOneMonthControl = new Date(DemoDay);
+				}
+				else if(Math.floor(DemoDay.getTime() - lastSixMonthsControl.getTime()) / day / 31 >= 6){
+					demoLog.push({"op": "CE", "date": GetDateString(DemoDay), "timestamp" : DemoDay.getTime() / 1000});
+					demoLog.push({"op": "PD", "date": GetDateString(DemoDay), "timestamp" : DemoDay.getTime() / 1000});
+					lastSixMonthsControl = new Date(DemoDay);
+				}
+
+				demoLog.push({"op": "GC", "date": GetDateString(DemoDay), "timestamp" : DemoDay.getTime() / 1000});
+
+				DemoDay.setDate(DemoDay.getDate() + 9);
+			}
+		}
+
+		function ChargeTicket(i){
+			setTimeout(function(){
+				if(demoLog[i].op == "GC"){
+					AppObj.GetCharge({from: Address_Customer, gas: 300000, value: MultiplyETH(TaxiDriver_Ticket)});
+					DemoTableHtml += CreateLine(demoLog[i].date, "<b>Customer paid ticket!</b>", MultiplyETH(TaxiDriver_Ticket), true, false, false);
+				}
+				else if(demoLog[i].op == "PS"){
+					AppObj.PaySalary(demoLog[i].timestamp);
+					DemoTableHtml += CreateLine(demoLog[i].date, "<b>Manager release salary to Taxi Driver's account!</b>", MultiplyETH(TaxiDriver_Cap), false, false, false);
+				}
+				else if(demoLog[i].op == "CE"){
+					AppObj.CarExpenses(demoLog[i].timestamp);
+					DemoTableHtml += CreateLine(demoLog[i].date, "<b>Manager paid to Car Dealer for Car Expenses!</b>", MultiplyETH(CarDealer_FixedExpenses), false, false, false);
+				}
+				else if(demoLog[i].op == "PD"){
+					AppObj.PayDividend(demoLog[i].timestamp);
+					DemoTableHtml += CreateLine(demoLog[i].date, "<b>Manager divide participants' profit to their account!</b>", 0, true, false, false);
+				}
+			}, 100);
+		}
+
+		function ApplyCharges(){
+			var iCharge = 0;
+			for(iCharge=0;iCharge<demoLog.length;iCharge++){
+				ChargeTicket(iCharge);
+			}
+		}
+
+		function SellCar(){
+			var carID = OwnedCar;
+			var price = Math.floor(Math.random() * Math.floor(150)) * 10;
+			var date = new Date(DemoDay.getUTCFullYear(), DemoDay.getUTCMonth(), DemoDay.getUTCDate());
+			date.setDate(date.getDate() + 10);
+			var timestamp = date.getTime() / 1000;
+
+			AppObj.PurchasePropose(carID, price, timestamp, {from: Address_CarDealer});
+			DemoTableHtml += CreateLine(GetDateString(DemoDay), "<b>Car Dealer set car purchase propose!</b><br><i>CarID : " + carID + "<br>Price : " + price + "<br>Valid Time : " + GetDateString(date) + "</i>", 0, false, false, false);
+
+			var enoughParticipantsCount = demoLogParticipant.length / 2 + 1;
+			for(var i=0;i<enoughParticipantsCount;i++){
+				AppObj.ApproveSellProposal({from: demoLogParticipant[i]});
+			}
+			DemoTableHtml += CreateLine(GetDateString(DemoDay), "<b>Total " + enoughParticipantsCount + " participants have approved purchase proposal!</b>", 0, false, false, false);
+
+			DemoDay.setDate(DemoDay.getDate() + 2);
+
+			AppObj.SellCar(DemoDay.getTime() / 1000, {from: Address_CarDealer, value: MultiplyETH(price)});
+			DemoTableHtml += CreateLine(GetDateString(DemoDay), "<b>Car Dealer send purchase car price!</b>", MultiplyETH(price), true, false, false);
+		}
+
+		function AllParticipantsAndDriverGet(){
+			DemoDay.setDate(DemoDay.getDate() + 2);
+			for(var i=0;i<demoLogParticipant.length;i++){
+				AppObj.GetDividend({from: demoLogParticipant[i]});
+			}
+			DemoTableHtml += CreateLine(GetDateString(DemoDay), "<b>All participants transfer money from their account to address!</b>", 0, false, false, true);
+			AppObj.GetSalary({from: Address_CarDealer});
+			DemoTableHtml += CreateLine(GetDateString(DemoDay), "<b>Taxi Driver transfer money from their account to address!</b>", 0, false, true, false);
+		}
+
+		function DemoConfig(){
+			$("#btnStartDemo").prop("disabled", true);
+
+			$("#btnStartDemo").on("click", function(){
+				$("#warnGenerate").show();
+				$("#btnStartDemo").prop("disabled", true);
+
+				demoLog = [];
+				demoLogParticipant = [];
+				DemoTableHtml = "";
+
+				DemoDay = new Date();
+
+				InitializeParticipants();
+				
+				setTimeout(function(){InitializeCarProposalAndPurchaseCar();}, 300);
+				setTimeout(function(){CreateTransactionsToLog();}, 600);
+				setTimeout(function(){ApplyCharges();}, 1000);
+				setTimeout(function(){SellCar();}, 2000);
+				setTimeout(function(){AllParticipantsAndDriverGet();}, 2500);
+
+				setTimeout(function(){
+					$("#tabledemo").empty();
+					$("#tabledemo").append(DemoTableHtml);
+					$("#tabledemo").append("</tbody>");
+
+					$("#btnShowBalanceD").on("click", function(){
+						FillBalanceModal(true);
+					});
+
+					$("#btnShowBalanceP").on("click", function(){
+						FillBalanceModal(false);
+					});
+
+					$("#warnGenerate").hide();
+					$("#btnStartDemo").prop("disabled", false);
+				}, 3000);
+			});
+		}
+
+		function FillBalanceModal(isTaxi){
+			var addArray = [];
+			if(isTaxi)
+				addArray.push(Address_TaxiDriver);
+			else
+				addArray = demoLogParticipant.slice();
+
+			var html = "";
+			for(var i=0;i<addArray.length;i++){
+				html += "<tr><td>" + addArray[i] + "</td><td>" + web3.fromWei(web3.eth.getBalance(addArray[i]), 'ether').toString() + " ETH</td></tr>";
+			}
+			$("#tablebodyshowbalance").empty();
+			$("#tablebodyshowbalance").append(html);
+			$("#ModalShowBalance").modal("show");
+		}
+
+		function GetAllInfo(){
+			AppObj.GetAllInfo(function(error, result){
+				if(!error){
+					Address_CarDealer = result[1];
+					Address_Manager = result[0];
+					Address_TaxiDriver = result[2];
+
+					TaxiDriver_Cap = DivideETH(result[3]);
+					TaxiDriver_Ticket = DivideETH(result[4]);
+
+					$("#inpDriverAddress").val(Address_TaxiDriver);
+					$("#inpDriverTicket").val(TaxiDriver_Ticket);
+					$("#inpDriverCap").val(TaxiDriver_Cap);
+
+					var html = "";
+					html = "<thead><tr><th></th><th></th><th>Address</th><tr></thead><tbody>";
+					html += "<tr><td></td><th>Account</th><td>" + web3.eth.defaultAccount + "</td></tr>";
+
+					html += "<tr><td><button class='btn btn-warning btn-sm infoChange' data-index='1' data-toggle='modal' href='#ModalInfoChange'>Change</button></td><th>Manager</th><td>" + result[0] + "</td></tr>";
+					html += "<tr><td><button class='btn btn-warning btn-sm infoChange' data-index='2' data-toggle='modal' href='#ModalInfoChange'>Change</button></td><th>Car Dealer</th><td>" + result[1] + "</td></tr>";
+					html += "<tr><td></td><th>Driver</th><td>" + result[2] + "</td></tr>";
+
+					html += "</tbody>";
+
+					$("#tableinfo").empty();
+					$("#tableinfo").html(html);
+
+					$(".infoChange").on("click", function(){
+						$("#ModalInfoChange #inpInfoChange").val($(this).data("index"));
+					});
+				}
+			});
+		}
+
+		function GenerateParticipants(i){
+			setTimeout(function(){
+				AppObj.Join({from: web3.eth.accounts[i], gas: 300000, value: MultiplyETH(100)});
+			}, 300);
+		}
+
+		$("#btnAllParticipants").on("click",function(){
+			var index = 5;
+			for(index=5;index<105;index++){
+				GenerateParticipants(index);
+			}
+			setTimeout(function(){
+				$("#btnStartDemo").prop("disabled", false);
+				$("#btnAllParticipants").prop("disabled", true);
+			}, 1000);
+		});
+
+		$("#btnDriverInfo").on("click", function(){
+			var dAddress = $("#inpDriverAddress").val();
+			var dTicketPrice = $("#inpDriverTicket").val();
+			var dCap = $("#inpDriverCap").val();
+
+			AppObj.SetDriver(dAddress, dTicketPrice, dCap);
+			GetAllInfo();
+		});
+
+		$("#btnInfoChange").on("click", function(){
+			var operation = $("#ModalInfoChange #inpInfoChange").val();
+			var address = $("#ModalInfoChange #inpPossAddress").val();
+			
+			if(operation == "1")
+				AppObj.SetManager(address);
+			else if(operation == "2")
+				AppObj.SetCarDealer(address);
+
+			$("#ModalInfoChange").modal("hide");
+			GetAllInfo();
+		});
+
+	</script>
+</body>
